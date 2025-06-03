@@ -20,6 +20,26 @@ export const useAuth = () => {
   return context;
 };
 
+// Helper functions to manage users in localStorage
+const getUsersFromStorage = () => {
+  const users = localStorage.getItem('eventapp_users');
+  if (users) {
+    return JSON.parse(users);
+  }
+  
+  // Initialize with default demo users if no users exist
+  const defaultUsers = [
+    { id: '1', email: 'organizer@example.com', password: 'password', name: 'John Organizer', role: 'organizer' },
+    { id: '2', email: 'attendee@example.com', password: 'password', name: 'Jane Attendee', role: 'attendee' }
+  ];
+  localStorage.setItem('eventapp_users', JSON.stringify(defaultUsers));
+  return defaultUsers;
+};
+
+const saveUsersToStorage = (users: any[]) => {
+  localStorage.setItem('eventapp_users', JSON.stringify(users));
+};
+
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -36,13 +56,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const login = async (email: string, password: string): Promise<boolean> => {
     setIsLoading(true);
     
-    // Mock authentication - replace with actual API call
-    const mockUsers = [
-      { id: '1', email: 'organizer@example.com', password: 'password', name: 'John Organizer', role: 'organizer' as const },
-      { id: '2', email: 'attendee@example.com', password: 'password', name: 'Jane Attendee', role: 'attendee' as const }
-    ];
-    
-    const foundUser = mockUsers.find(u => u.email === email && u.password === password);
+    const users = getUsersFromStorage();
+    const foundUser = users.find((u: any) => u.email === email && u.password === password);
     
     if (foundUser) {
       const user = { id: foundUser.id, email: foundUser.email, name: foundUser.name, role: foundUser.role };
@@ -59,16 +74,32 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const register = async (email: string, password: string, name: string, role: 'organizer' | 'attendee'): Promise<boolean> => {
     setIsLoading(true);
     
-    // Mock registration - replace with actual API call
+    const users = getUsersFromStorage();
+    
+    // Check if user already exists
+    const existingUser = users.find((u: any) => u.email === email);
+    if (existingUser) {
+      setIsLoading(false);
+      return false;
+    }
+    
+    // Create new user
     const newUser = {
       id: Date.now().toString(),
       email,
+      password,
       name,
       role
     };
     
-    setUser(newUser);
-    localStorage.setItem('eventapp_user', JSON.stringify(newUser));
+    // Add to users array and save
+    const updatedUsers = [...users, newUser];
+    saveUsersToStorage(updatedUsers);
+    
+    // Log the user in
+    const userForState = { id: newUser.id, email: newUser.email, name: newUser.name, role: newUser.role };
+    setUser(userForState);
+    localStorage.setItem('eventapp_user', JSON.stringify(userForState));
     setIsLoading(false);
     return true;
   };
