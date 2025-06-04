@@ -1,82 +1,56 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Event } from '@/types';
 import EventCard from '@/components/events/EventCard';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Search, Filter } from 'lucide-react';
+import { useAuth } from '@/contexts/AuthContext';
+
+// Helper function to get events from localStorage
+const getEventsFromStorage = () => {
+  const events = localStorage.getItem('eventapp_events');
+  return events ? JSON.parse(events) : [];
+};
 
 const Events = () => {
+  const { user } = useAuth();
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('');
+  const [events, setEvents] = useState<Event[]>([]);
 
-  // Mock events data
-  const mockEvents: Event[] = [
-    {
-      id: '1',
-      title: 'Tech Conference 2024',
-      description: 'Join industry leaders for the latest in technology trends and innovations.',
-      date: '2024-08-15',
-      time: '09:00',
-      venue: 'Convention Center, San Francisco',
-      capacity: 500,
-      price: 299,
-      category: 'Technology',
-      image: 'https://images.unsplash.com/photo-1540575467063-178a50c2df87?w=500&h=300&fit=crop',
-      organizerId: '1',
-      organizerName: 'Tech Events Corp',
-      ticketsSold: 234,
-      status: 'published',
-      createdAt: '2024-01-15',
-      updatedAt: '2024-01-15'
-    },
-    {
-      id: '2',
-      title: 'Music Festival Summer 2024',
-      description: 'Three days of amazing music with top artists from around the world.',
-      date: '2024-07-20',
-      time: '16:00',
-      venue: 'Golden Gate Park, San Francisco',
-      capacity: 10000,
-      price: 149,
-      category: 'Music',
-      image: 'https://images.unsplash.com/photo-1459749411175-04bf5292ceea?w=500&h=300&fit=crop',
-      organizerId: '1',
-      organizerName: 'Music Festivals Inc',
-      ticketsSold: 7500,
-      status: 'published',
-      createdAt: '2024-01-10',
-      updatedAt: '2024-01-10'
-    },
-    {
-      id: '3',
-      title: 'Art Workshop Series',
-      description: 'Learn painting techniques from professional artists in a hands-on workshop.',
-      date: '2024-06-10',
-      time: '14:00',
-      venue: 'Art Studio Downtown',
-      capacity: 25,
-      price: 75,
-      category: 'Art',
-      image: 'https://images.unsplash.com/photo-1513475382585-d06e58bcb0e0?w=500&h=300&fit=crop',
-      organizerId: '1',
-      organizerName: 'Creative Workshops',
-      ticketsSold: 18,
-      status: 'published',
-      createdAt: '2024-01-08',
-      updatedAt: '2024-01-08'
-    }
-  ];
+  // Load events from localStorage on component mount
+  useEffect(() => {
+    const storedEvents = getEventsFromStorage();
+    // Show only published events
+    const publishedEvents = storedEvents.filter((event: Event) => event.status === 'published');
+    setEvents(publishedEvents);
+  }, []);
 
   const categories = ['All', 'Technology', 'Music', 'Art', 'Business', 'Sports', 'Food'];
 
-  const filteredEvents = mockEvents.filter(event => {
+  const filteredEvents = events.filter(event => {
     const matchesSearch = event.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          event.description.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesCategory = selectedCategory === '' || selectedCategory === 'All' || 
                            event.category === selectedCategory;
     return matchesSearch && matchesCategory;
   });
+
+  const handleEditEvent = (event: Event) => {
+    // Redirect to organizer events page for editing
+    window.location.href = '/organizer/events';
+  };
+
+  const handleDeleteEvent = (eventId: string) => {
+    const updatedEvents = events.filter(event => event.id !== eventId);
+    setEvents(updatedEvents);
+    
+    // Update localStorage
+    const allEvents = getEventsFromStorage();
+    const filteredAllEvents = allEvents.filter((event: Event) => event.id !== eventId);
+    localStorage.setItem('eventapp_events', JSON.stringify(filteredAllEvents));
+  };
 
   return (
     <div className="min-h-screen bg-gray-50 py-8">
@@ -115,7 +89,13 @@ const Events = () => {
         {/* Events Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {filteredEvents.map((event) => (
-            <EventCard key={event.id} event={event} />
+            <EventCard 
+              key={event.id} 
+              event={event} 
+              showActions={user?.role === 'organizer' && event.organizerId === user?.id}
+              onEdit={handleEditEvent}
+              onDelete={handleDeleteEvent}
+            />
           ))}
         </div>
 

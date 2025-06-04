@@ -71,11 +71,11 @@ const EventCard = ({ event, showActions = false, onEdit, onDelete }: EventCardPr
 
         <div className="flex justify-between items-center pt-2">
           {showActions ? (
-            <div className="flex space-x-2">
-              <Button variant="outline" size="sm" onClick={() => onEdit?.(event)}>
+            <div className="flex space-x-2 w-full">
+              <Button variant="outline" size="sm" onClick={() => onEdit?.(event)} className="flex-1">
                 Edit
               </Button>
-              <Button variant="destructive" size="sm" onClick={() => onDelete?.(event.id)}>
+              <Button variant="destructive" size="sm" onClick={() => onDelete?.(event.id)} className="flex-1">
                 Delete
               </Button>
             </div>
