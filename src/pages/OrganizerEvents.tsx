@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Event } from '@/types';
 import EventCard from '@/components/events/EventCard';
 import EventForm from '@/components/events/EventForm';
@@ -8,39 +8,39 @@ import { Plus } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 
+// Helper functions to manage events in localStorage
+const getEventsFromStorage = () => {
+  const events = localStorage.getItem('eventapp_events');
+  return events ? JSON.parse(events) : [];
+};
+
+const saveEventsToStorage = (events: Event[]) => {
+  localStorage.setItem('eventapp_events', JSON.stringify(events));
+};
+
 const OrganizerEvents = () => {
   const { user } = useAuth();
   const [showForm, setShowForm] = useState(false);
   const [editingEvent, setEditingEvent] = useState<Event | undefined>();
-  const [events, setEvents] = useState<Event[]>([
-    {
-      id: '1',
-      title: 'Tech Conference 2024',
-      description: 'Join industry leaders for the latest in technology trends.',
-      date: '2024-08-15',
-      time: '09:00',
-      venue: 'Convention Center, San Francisco',
-      capacity: 500,
-      price: 299,
-      category: 'Technology',
-      image: 'https://images.unsplash.com/photo-1540575467063-178a50c2df87?w=500&h=300&fit=crop',
-      organizerId: user?.id || '1',
-      organizerName: user?.name || 'Tech Events Corp',
-      ticketsSold: 234,
-      status: 'published',
-      createdAt: '2024-01-15',
-      updatedAt: '2024-01-15'
-    }
-  ]);
+  const [events, setEvents] = useState<Event[]>([]);
+
+  // Load events from localStorage on component mount
+  useEffect(() => {
+    const storedEvents = getEventsFromStorage();
+    // Filter events for current user
+    const userEvents = storedEvents.filter((event: Event) => event.organizerId === user?.id);
+    setEvents(userEvents);
+  }, [user?.id]);
 
   const handleSaveEvent = (eventData: Partial<Event>) => {
+    let updatedEvents: Event[];
+    
     if (editingEvent) {
       // Update existing event
-      setEvents(events.map(event => 
-        event.id === editingEvent.id 
-          ? { ...event, ...eventData, updatedAt: new Date().toISOString() }
-          : event
-      ));
+      const updatedEvent = { ...editingEvent, ...eventData, updatedAt: new Date().toISOString() };
+      updatedEvents = events.map(event => 
+        event.id === editingEvent.id ? updatedEvent : event
+      );
       toast.success('Event updated successfully!');
     } else {
       // Create new event
@@ -54,9 +54,17 @@ const OrganizerEvents = () => {
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString()
       };
-      setEvents([...events, newEvent]);
+      updatedEvents = [...events, newEvent];
       toast.success('Event created successfully!');
     }
+    
+    setEvents(updatedEvents);
+    
+    // Save all events (including other users' events) to localStorage
+    const allEvents = getEventsFromStorage();
+    const otherUsersEvents = allEvents.filter((event: Event) => event.organizerId !== user?.id);
+    const allUpdatedEvents = [...otherUsersEvents, ...updatedEvents];
+    saveEventsToStorage(allUpdatedEvents);
     
     setShowForm(false);
     setEditingEvent(undefined);
@@ -68,7 +76,14 @@ const OrganizerEvents = () => {
   };
 
   const handleDeleteEvent = (eventId: string) => {
-    setEvents(events.filter(event => event.id !== eventId));
+    const updatedEvents = events.filter(event => event.id !== eventId);
+    setEvents(updatedEvents);
+    
+    // Update localStorage
+    const allEvents = getEventsFromStorage();
+    const filteredAllEvents = allEvents.filter((event: Event) => event.id !== eventId);
+    saveEventsToStorage(filteredAllEvents);
+    
     toast.success('Event deleted successfully!');
   };
 
