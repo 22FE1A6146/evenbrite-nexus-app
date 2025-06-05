@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -8,32 +8,28 @@ import { Calendar, MapPin, Users, DollarSign, ArrowLeft, Ticket } from 'lucide-r
 import { useAuth } from '@/contexts/AuthContext';
 import QRCodeDisplay from '@/components/tickets/QRCodeDisplay';
 import { toast } from 'sonner';
+import { Event, Ticket as TicketType } from '@/types';
 
 const EventDetails = () => {
   const { id } = useParams();
   const { user } = useAuth();
   const [showTicket, setShowTicket] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [event, setEvent] = useState<Event | null>(null);
 
-  // Mock event data - in real app, fetch by ID
-  const event = {
-    id: '1',
-    title: 'Tech Conference 2024',
-    description: 'Join industry leaders for the latest in technology trends and innovations. This comprehensive conference will cover artificial intelligence, blockchain technology, cloud computing, and the future of digital transformation. Network with professionals, attend hands-on workshops, and gain insights from keynote speakers who are shaping the tech landscape.',
-    date: '2024-08-15',
-    time: '09:00',
-    venue: 'Convention Center, San Francisco',
-    capacity: 500,
-    price: 299,
-    category: 'Technology',
-    image: 'https://images.unsplash.com/photo-1540575467063-178a50c2df87?w=800&h=400&fit=crop',
-    organizerId: '1',
-    organizerName: 'Tech Events Corp',
-    ticketsSold: 234,
-    status: 'published',
-    createdAt: '2024-01-15',
-    updatedAt: '2024-01-15'
-  };
+  // Load event from localStorage
+  useEffect(() => {
+    const getEventsFromStorage = () => {
+      const events = localStorage.getItem('eventapp_events');
+      return events ? JSON.parse(events) : [];
+    };
+
+    const events = getEventsFromStorage();
+    const foundEvent = events.find((e: Event) => e.id === id);
+    if (foundEvent) {
+      setEvent(foundEvent);
+    }
+  }, [id]);
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('en-US', {
@@ -50,11 +46,16 @@ const EventDetails = () => {
       return;
     }
 
+    if (!event) {
+      toast.error('Event not found');
+      return;
+    }
+
     setIsLoading(true);
     
     // Mock ticket purchase
     setTimeout(() => {
-      const mockTicket = {
+      const mockTicket: TicketType = {
         id: `ticket-${Date.now()}`,
         eventId: event.id,
         userId: user.id,
@@ -63,9 +64,28 @@ const EventDetails = () => {
         purchaseDate: new Date().toISOString(),
         price: event.price,
         qrCode: `${event.id}-${user.id}-${Date.now()}`,
-        status: 'valid' as const,
+        status: 'valid',
         seatNumber: `A-${Math.floor(Math.random() * 100) + 1}`
       };
+
+      // Save ticket to localStorage
+      const existingTickets = localStorage.getItem('eventapp_tickets');
+      const tickets = existingTickets ? JSON.parse(existingTickets) : [];
+      tickets.push(mockTicket);
+      localStorage.setItem('eventapp_tickets', JSON.stringify(tickets));
+
+      // Update event ticket count
+      const events = JSON.parse(localStorage.getItem('eventapp_events') || '[]');
+      const updatedEvents = events.map((e: Event) => {
+        if (e.id === event.id) {
+          return { ...e, ticketsSold: e.ticketsSold + 1 };
+        }
+        return e;
+      });
+      localStorage.setItem('eventapp_events', JSON.stringify(updatedEvents));
+
+      // Update local event state
+      setEvent(prev => prev ? { ...prev, ticketsSold: prev.ticketsSold + 1 } : null);
 
       setShowTicket(true);
       toast.success('Ticket purchased successfully!');
@@ -73,8 +93,18 @@ const EventDetails = () => {
     }, 2000);
   };
 
+  if (!event) {
+    return (
+      <div className="min-h-screen bg-gray-50 py-8">
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+          <p>Event not found</p>
+        </div>
+      </div>
+    );
+  }
+
   if (showTicket) {
-    const mockTicket = {
+    const mockTicket: TicketType = {
       id: `ticket-${Date.now()}`,
       eventId: event.id,
       userId: user?.id || '',
@@ -83,7 +113,7 @@ const EventDetails = () => {
       purchaseDate: new Date().toISOString(),
       price: event.price,
       qrCode: `${event.id}-${user?.id}-${Date.now()}`,
-      status: 'valid' as const,
+      status: 'valid',
       seatNumber: `A-${Math.floor(Math.random() * 100) + 1}`
     };
 

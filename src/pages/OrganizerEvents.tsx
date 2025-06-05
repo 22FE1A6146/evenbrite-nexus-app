@@ -24,12 +24,21 @@ const OrganizerEvents = () => {
   const [editingEvent, setEditingEvent] = useState<Event | undefined>();
   const [events, setEvents] = useState<Event[]>([]);
 
-  // Load events from localStorage on component mount
+  // Load events from localStorage on component mount and set up refresh interval
   useEffect(() => {
-    const storedEvents = getEventsFromStorage();
-    // Filter events for current user
-    const userEvents = storedEvents.filter((event: Event) => event.organizerId === user?.id);
-    setEvents(userEvents);
+    const loadEvents = () => {
+      const storedEvents = getEventsFromStorage();
+      // Filter events for current user
+      const userEvents = storedEvents.filter((event: Event) => event.organizerId === user?.id);
+      setEvents(userEvents);
+    };
+
+    loadEvents();
+
+    // Set up interval to refresh events every 5 seconds to catch ticket updates
+    const interval = setInterval(loadEvents, 5000);
+
+    return () => clearInterval(interval);
   }, [user?.id]);
 
   const handleSaveEvent = (eventData: Partial<Event>) => {

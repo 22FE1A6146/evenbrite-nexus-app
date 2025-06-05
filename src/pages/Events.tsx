@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Event } from '@/types';
 import EventCard from '@/components/events/EventCard';
@@ -19,12 +18,21 @@ const Events = () => {
   const [selectedCategory, setSelectedCategory] = useState('');
   const [events, setEvents] = useState<Event[]>([]);
 
-  // Load events from localStorage on component mount
+  // Load events from localStorage on component mount and set up refresh
   useEffect(() => {
-    const storedEvents = getEventsFromStorage();
-    // Show only published events
-    const publishedEvents = storedEvents.filter((event: Event) => event.status === 'published');
-    setEvents(publishedEvents);
+    const loadEvents = () => {
+      const storedEvents = getEventsFromStorage();
+      // Show only published events
+      const publishedEvents = storedEvents.filter((event: Event) => event.status === 'published');
+      setEvents(publishedEvents);
+    };
+
+    loadEvents();
+
+    // Set up interval to refresh events every 5 seconds to catch ticket updates
+    const interval = setInterval(loadEvents, 5000);
+
+    return () => clearInterval(interval);
   }, []);
 
   const categories = ['All', 'Technology', 'Music', 'Art', 'Business', 'Sports', 'Food'];
