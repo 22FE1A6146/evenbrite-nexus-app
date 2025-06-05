@@ -4,7 +4,9 @@ import { useParams, Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Calendar, MapPin, Users, DollarSign, ArrowLeft, Ticket } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Calendar, MapPin, Users, DollarSign, ArrowLeft, Ticket, Plus, Minus } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import QRCodeDisplay from '@/components/tickets/QRCodeDisplay';
 import { toast } from 'sonner';
@@ -16,6 +18,7 @@ const EventDetails = () => {
   const [showTicket, setShowTicket] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [event, setEvent] = useState<Event | null>(null);
+  const [ticketQuantity, setTicketQuantity] = useState(1);
 
   // Load event from localStorage
   useEffect(() => {
@@ -40,6 +43,13 @@ const EventDetails = () => {
     });
   };
 
+  const handleQuantityChange = (change: number) => {
+    const newQuantity = ticketQuantity + change;
+    if (newQuantity >= 1 && event && newQuantity <= (event.capacity - event.ticketsSold)) {
+      setTicketQuantity(newQuantity);
+    }
+  };
+
   const handlePurchaseTicket = async () => {
     if (!user) {
       toast.error('Please login to purchase tickets');
@@ -51,44 +61,55 @@ const EventDetails = () => {
       return;
     }
 
+    const availableTickets = event.capacity - event.ticketsSold;
+    if (ticketQuantity > availableTickets) {
+      toast.error(`Only ${availableTickets} tickets available`);
+      return;
+    }
+
     setIsLoading(true);
     
-    // Mock ticket purchase
+    // Mock ticket purchase for multiple tickets
     setTimeout(() => {
-      const mockTicket: TicketType = {
-        id: `ticket-${Date.now()}`,
-        eventId: event.id,
-        userId: user.id,
-        userEmail: user.email,
-        userName: user.name,
-        purchaseDate: new Date().toISOString(),
-        price: event.price,
-        qrCode: `${event.id}-${user.id}-${Date.now()}`,
-        status: 'valid',
-        seatNumber: `A-${Math.floor(Math.random() * 100) + 1}`
-      };
+      const tickets: TicketType[] = [];
+      
+      for (let i = 0; i < ticketQuantity; i++) {
+        const mockTicket: TicketType = {
+          id: `ticket-${Date.now()}-${i}`,
+          eventId: event.id,
+          userId: user.id,
+          userEmail: user.email,
+          userName: user.name,
+          purchaseDate: new Date().toISOString(),
+          price: event.price,
+          qrCode: `${event.id}-${user.id}-${Date.now()}-${i}`,
+          status: 'valid',
+          seatNumber: `A-${Math.floor(Math.random() * 100) + 1 + i}`
+        };
+        tickets.push(mockTicket);
+      }
 
-      // Save ticket to localStorage
+      // Save tickets to localStorage
       const existingTickets = localStorage.getItem('eventapp_tickets');
-      const tickets = existingTickets ? JSON.parse(existingTickets) : [];
-      tickets.push(mockTicket);
-      localStorage.setItem('eventapp_tickets', JSON.stringify(tickets));
+      const allTickets = existingTickets ? JSON.parse(existingTickets) : [];
+      allTickets.push(...tickets);
+      localStorage.setItem('eventapp_tickets', JSON.stringify(allTickets));
 
       // Update event ticket count
       const events = JSON.parse(localStorage.getItem('eventapp_events') || '[]');
       const updatedEvents = events.map((e: Event) => {
         if (e.id === event.id) {
-          return { ...e, ticketsSold: e.ticketsSold + 1 };
+          return { ...e, ticketsSold: e.ticketsSold + ticketQuantity };
         }
         return e;
       });
       localStorage.setItem('eventapp_events', JSON.stringify(updatedEvents));
 
       // Update local event state
-      setEvent(prev => prev ? { ...prev, ticketsSold: prev.ticketsSold + 1 } : null);
+      setEvent(prev => prev ? { ...prev, ticketsSold: prev.ticketsSold + ticketQuantity } : null);
 
       setShowTicket(true);
-      toast.success('Ticket purchased successfully!');
+      toast.success(`${ticketQuantity} ticket${ticketQuantity > 1 ? 's' : ''} purchased successfully!`);
       setIsLoading(false);
     }, 2000);
   };
@@ -111,7 +132,7 @@ const EventDetails = () => {
       userEmail: user?.email || '',
       userName: user?.name || '',
       purchaseDate: new Date().toISOString(),
-      price: event.price,
+      price: event.price * ticketQuantity,
       qrCode: `${event.id}-${user?.id}-${Date.now()}`,
       status: 'valid',
       seatNumber: `A-${Math.floor(Math.random() * 100) + 1}`
@@ -135,6 +156,9 @@ const EventDetails = () => {
       </div>
     );
   }
+
+  const availableTickets = event.capacity - event.ticketsSold;
+  const totalPrice = event.price * ticketQuantity;
 
   return (
     <div className="min-h-screen bg-gray-50 py-8">
@@ -192,7 +216,7 @@ const EventDetails = () => {
                   
                   <div className="flex items-center space-x-3">
                     <DollarSign className="w-5 h-5 text-gray-400" />
-                    <p className="text-lg font-semibold">${event.price}</p>
+                    <p className="text-lg font-semibold">${event.price} per ticket</p>
                   </div>
                 </div>
               </div>
@@ -201,25 +225,65 @@ const EventDetails = () => {
                 <CardHeader>
                   <CardTitle className="flex items-center space-x-2">
                     <Ticket className="w-5 h-5" />
-                    <span>Purchase Ticket</span>
+                    <span>Purchase Tickets</span>
                   </CardTitle>
                   <CardDescription>
-                    Join this amazing event for just ${event.price}
+                    {availableTickets} tickets available
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-4">
+                    {user && availableTickets > 0 && (
+                      <div className="space-y-2">
+                        <Label htmlFor="quantity">Number of Tickets</Label>
+                        <div className="flex items-center space-x-3">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleQuantityChange(-1)}
+                            disabled={ticketQuantity <= 1}
+                          >
+                            <Minus className="w-4 h-4" />
+                          </Button>
+                          <Input
+                            id="quantity"
+                            type="number"
+                            min="1"
+                            max={availableTickets}
+                            value={ticketQuantity}
+                            onChange={(e) => {
+                              const value = parseInt(e.target.value);
+                              if (value >= 1 && value <= availableTickets) {
+                                setTicketQuantity(value);
+                              }
+                            }}
+                            className="w-20 text-center"
+                          />
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleQuantityChange(1)}
+                            disabled={ticketQuantity >= availableTickets}
+                          >
+                            <Plus className="w-4 h-4" />
+                          </Button>
+                        </div>
+                      </div>
+                    )}
+                    
                     <div className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
-                      <span>Ticket Price</span>
-                      <span className="font-semibold">${event.price}</span>
+                      <span>Total Price</span>
+                      <span className="font-semibold">${totalPrice}</span>
                     </div>
                     
                     <Button
                       onClick={handlePurchaseTicket}
-                      disabled={isLoading || !user}
+                      disabled={isLoading || !user || availableTickets === 0}
                       className="w-full"
                     >
-                      {isLoading ? 'Processing...' : user ? 'Purchase Ticket' : 'Login to Purchase'}
+                      {isLoading ? 'Processing...' : 
+                       availableTickets === 0 ? 'Sold Out' :
+                       user ? `Purchase ${ticketQuantity} Ticket${ticketQuantity > 1 ? 's' : ''}` : 'Login to Purchase'}
                     </Button>
                     
                     {!user && (
